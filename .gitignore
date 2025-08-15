@@ -1,0 +1,5 @@
+# Homebrew tap specific ignores
+.DS_Store
+*.swp
+*.swo
+*~
