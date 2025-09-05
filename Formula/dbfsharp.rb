@@ -23,7 +23,7 @@ class Dbfsharp < Formula
   end
 
   def install
-    bin.install "dbfsharp"
+    bin.install "DbfSharp.ConsoleAot" => "dbfsharp"
   end
 
   test do
