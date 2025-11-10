@@ -1,0 +1,119 @@
+name: Update dbfsharp Formula
+
+on:
+  repository_dispatch:
+    types: [new_release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g., v0.2.7)'
+        required: true
+        type: string
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix if present
+
+          echo "full=${VERSION}" >> $GITHUB_OUTPUT
+          echo "number=${VERSION_NUM}" >> $GITHUB_OUTPUT
+
+      - name: Download and calculate SHA256 for all platforms
+        id: download
+        run: |
+          VERSION="${{ steps.version.outputs.full }}"
+
+          echo "Downloading release assets for ${VERSION}..."
+
+          # Download all platform releases
+          for asset in "dbfsharp-osx-arm64.tar.gz" "dbfsharp-osx-x64.tar.gz" "dbfsharp-linux-x64.tar.gz"; do
+            echo "Downloading ${asset}..."
+            wget -q "https://github.com/emmorts/dbfsharp/releases/download/${VERSION}/${asset}"
+
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to download ${asset}"
+              exit 1
+            fi
+
+            sha256sum "${asset}" | awk '{print $1}' > "${asset}.sha256"
+          done
+
+          # Store SHA values
+          SHA_OSX_ARM64=$(cat dbfsharp-osx-arm64.tar.gz.sha256)
+          SHA_OSX_X64=$(cat dbfsharp-osx-x64.tar.gz.sha256)
+          SHA_LINUX_X64=$(cat dbfsharp-linux-x64.tar.gz.sha256)
+
+          echo "sha_osx_arm64=${SHA_OSX_ARM64}" >> $GITHUB_OUTPUT
+          echo "sha_osx_x64=${SHA_OSX_X64}" >> $GITHUB_OUTPUT
+          echo "sha_linux_x64=${SHA_LINUX_X64}" >> $GITHUB_OUTPUT
+
+          echo "SHA256 hashes calculated:"
+          echo "  macOS ARM64: ${SHA_OSX_ARM64}"
+          echo "  macOS x64:   ${SHA_OSX_X64}"
+          echo "  Linux x64:   ${SHA_LINUX_X64}"
+
+      - name: Update formula
+        run: |
+          VERSION_NUM="${{ steps.version.outputs.number }}"
+          VERSION_FULL="${{ steps.version.outputs.full }}"
+
+          echo "Updating formula to version ${VERSION_NUM}..."
+
+          # Update version field
+          sed -i 's/version ".*"/version "'"${VERSION_NUM}"'"/' Formula/dbfsharp.rb
+
+          # Update URLs with new version
+          sed -i "s|download/v[0-9.]\+/|download/${VERSION_FULL}/|g" Formula/dbfsharp.rb
+
+          # Update SHA256 hashes using a more precise approach
+          # We'll use awk to replace the sha256 values in order
+          awk -v sha1="${{ steps.download.outputs.sha_osx_arm64 }}" \
+              -v sha2="${{ steps.download.outputs.sha_osx_x64 }}" \
+              -v sha3="${{ steps.download.outputs.sha_linux_x64 }}" '
+          BEGIN { count=0 }
+          /sha256 ".*"/ {
+            count++
+            if (count == 1) { sub(/sha256 ".*"/, "sha256 \"" sha1 "\"") }
+            else if (count == 2) { sub(/sha256 ".*"/, "sha256 \"" sha2 "\"") }
+            else if (count == 3) { sub(/sha256 ".*"/, "sha256 \"" sha3 "\"") }
+          }
+          { print }
+          ' Formula/dbfsharp.rb > Formula/dbfsharp.rb.tmp
+
+          mv Formula/dbfsharp.rb.tmp Formula/dbfsharp.rb
+
+          echo "Formula updated successfully"
+          cat Formula/dbfsharp.rb
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "bump dbfsharp to v${{ steps.version.outputs.number }}"
+          title: "Update dbfsharp to v${{ steps.version.outputs.number }}"
+          body: |
+            Automated update triggered by new release of dbfsharp.
+
+            - **Version:** v${{ steps.version.outputs.number }}
+            - **Release:** https://github.com/emmorts/dbfsharp/releases/tag/${{ steps.version.outputs.full }}
+
+            ### SHA256 Checksums
+            - macOS ARM64: `${{ steps.download.outputs.sha_osx_arm64 }}`
+            - macOS x64: `${{ steps.download.outputs.sha_osx_x64 }}`
+            - Linux x64: `${{ steps.download.outputs.sha_linux_x64 }}`
+
+            This PR was automatically created by the update-formula workflow.
+          branch: "auto-update-v${{ steps.version.outputs.number }}"
+          delete-branch: true
+          token: ${{ secrets.GITHUB_TOKEN }}
