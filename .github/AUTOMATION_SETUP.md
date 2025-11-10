@@ -13,15 +13,23 @@ This repository is configured to automatically update the dbfsharp formula when 
 
 ## Setup Instructions
 
-### Step 1: Create Personal Access Token (PAT)
+### Step 1: Create Fine-Grained Personal Access Token (PAT)
 
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Click "Generate new token (classic)"
-3. Name it something like "Homebrew Tap Auto Update"
-4. Select the following scopes:
-   - `repo` (Full control of private repositories)
+1. Go to GitHub Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+2. Click "Generate new token"
+3. Configure the token:
+   - **Token name:** "Homebrew Tap Auto Update" (or similar)
+   - **Expiration:** Choose your preferred expiration (recommend 90 days or 1 year)
+   - **Repository access:** Select "Only select repositories"
+     - Choose: `emmorts/homebrew-tools`
+4. Under **Repository permissions**, set:
+   - **Contents:** Read and Write access
+   - **Metadata:** Read access (automatically selected, mandatory)
+   - **Workflows:** Read and Write access
 5. Click "Generate token"
-6. **Copy the token** (you won't be able to see it again)
+6. **Copy the token immediately** (you won't be able to see it again)
+
+> **Note:** Fine-grained tokens are more secure than classic tokens as they have granular permissions and can be scoped to specific repositories. If you prefer to use a classic token, select the `repo` scope instead.
 
 ### Step 2: Add Secret to dbfsharp Repository
 
@@ -97,7 +105,11 @@ Once set up, the automation works automatically:
 
 ### Workflow doesn't trigger
 - Verify the `TAP_REPO_TOKEN` secret is set correctly in the dbfsharp repository
-- Check that the token has the `repo` scope
+- Check that the token has the required permissions:
+  - **Contents:** Read and Write
+  - **Workflows:** Read and Write
+  - **Metadata:** Read
+- Ensure the token has access to the `emmorts/homebrew-tools` repository
 - Ensure the workflow file exists in dbfsharp at `.github/workflows/update-homebrew.yml`
 
 ### Downloads fail
@@ -110,7 +122,14 @@ Once set up, the automation works automatically:
 
 ## Security Notes
 
-- The PAT should only be granted `repo` scope (nothing more)
-- The token is stored as an encrypted secret in GitHub
+- **Fine-grained tokens are recommended** over classic tokens for better security
+- The PAT should only be granted the minimum required permissions:
+  - Contents: Read and Write
+  - Workflows: Read and Write
+  - Metadata: Read
+- The token should only have access to the `emmorts/homebrew-tools` repository
+- The token is stored as an encrypted secret in GitHub Actions
+- Set an appropriate expiration date for the token (e.g., 90 days or 1 year)
+- You'll receive an email notification before the token expires
 - Consider using a machine user account for the PAT if preferred
 - You can revoke the token at any time from GitHub settings
