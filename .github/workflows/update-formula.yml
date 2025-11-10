@@ -97,6 +97,12 @@ jobs:
           echo "Formula updated successfully"
           cat Formula/dbfsharp.rb
 
+      - name: Clean up downloaded files
+        run: |
+          echo "Cleaning up downloaded release assets..."
+          rm -f dbfsharp-*.tar.gz dbfsharp-*.tar.gz.sha256
+          echo "Cleanup complete"
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
