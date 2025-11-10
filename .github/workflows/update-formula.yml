@@ -13,6 +13,9 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -96,6 +99,12 @@ jobs:
 
           echo "Formula updated successfully"
           cat Formula/dbfsharp.rb
+
+      - name: Clean up downloaded files
+        run: |
+          echo "Cleaning up downloaded release assets..."
+          rm -f dbfsharp-*.tar.gz dbfsharp-*.tar.gz.sha256
+          echo "Cleanup complete"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
